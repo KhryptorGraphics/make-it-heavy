@@ -41,16 +41,22 @@ class TaskOrchestrator:
             num_agents=num_agents
         )
         
-        # Remove task completion tool to avoid issues
-        question_agent.tools = [tool for tool in question_agent.tools if tool.get('function', {}).get('name') != 'mark_task_complete']
-        question_agent.tool_mapping = {name: func for name, func in question_agent.tool_mapping.items() if name != 'mark_task_complete'}
+        # Keep task completion tool so agent can signal when done
         
         try:
             # Get AI-generated questions
             response = question_agent.run(generation_prompt)
             
+            # Extract JSON from response (look for array pattern)
+            import re
+            json_match = re.search(r'\[.*?\]', response, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+            else:
+                json_str = response.strip()
+            
             # Parse JSON response
-            questions = json.loads(response.strip())
+            questions = json.loads(json_str)
             
             # Validate we got the right number of questions
             if len(questions) != num_agents:

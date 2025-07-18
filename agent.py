@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, List, Union
 from openai.types.chat import ChatCompletion
 from exceptions import APIError, ToolExecutionError, AgentError, ConfigurationError
 from constants import (
-    DEFAULT_MAX_ITERATIONS, TOKEN_ESTIMATION_RATIO, AGENT_STATUS_INITIALIZING,
+    DEFAULT_MAX_ITERATIONS, TOKEN_ESTIMATION_RATIO, DEFAULT_API_TIMEOUT, AGENT_STATUS_INITIALIZING,
     AGENT_STATUS_RUNNING, AGENT_STATUS_COMPLETED, AGENT_STATUS_FAILED,
     ERROR_INVALID_API_KEY, ERROR_AGENT_MAX_ITERATIONS, SUCCESS_AGENT_INITIALIZED
 )
@@ -60,10 +60,12 @@ class OpenRouterAgent:
             max_iterations = self.config.get('agent', {}).get('max_iterations', 10)
             self.metrics = self.ui_manager.create_agent_metrics(self.agent_id, max_iterations)
         
-        # Initialize OpenAI client with OpenRouter
+        # Initialize OpenAI client with OpenRouter and timeout
+        api_timeout = self.config.get('performance', {}).get('api_timeout', DEFAULT_API_TIMEOUT)
         self.client = OpenAI(
             base_url=self.config['openrouter']['base_url'],
-            api_key=self.config['openrouter']['api_key']
+            api_key=self.config['openrouter']['api_key'],
+            timeout=api_timeout
         )
         
         # Discover tools dynamically

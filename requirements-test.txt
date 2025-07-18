@@ -1,0 +1,13 @@
+# Testing dependencies for Make It Heavy
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-xdist>=3.3.1  # Parallel test execution
+pytest-mock>=3.11.1  # Mocking support
+pytest-asyncio>=0.21.0  # Async test support
+pytest-watch>=4.2.0  # Continuous testing
+pytest-html>=3.2.0  # HTML test reports
+mutmut>=2.4.3  # Mutation testing
+freezegun>=1.2.2  # Time mocking for tests
+responses>=0.23.1  # HTTP mocking
+fakeredis>=2.16.0  # Redis mocking if needed
+factory-boy>=3.3.0  # Test data generation

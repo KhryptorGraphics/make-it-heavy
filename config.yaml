@@ -40,7 +40,7 @@ orchestrator:
     Return your response as a JSON array of strings, like this:
     ["question 1", "question 2", "question 3", "question 4"]
     
-    Only return the JSON array, nothing else.
+    After providing the JSON array, IMMEDIATELY call the mark_task_complete tool to signal that question generation is finished.
 
   # Synthesis prompt for combining all agent responses
   synthesis_prompt: |
