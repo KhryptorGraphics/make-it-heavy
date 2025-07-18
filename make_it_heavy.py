@@ -2,10 +2,15 @@ import time
 import threading
 import sys
 from orchestrator import TaskOrchestrator
+from ui_manager import UIManager
 
 class OrchestratorCLI:
     def __init__(self):
-        self.orchestrator = TaskOrchestrator()
+        # Initialize UI Manager
+        self.ui_manager = UIManager()
+        
+        # Initialize orchestrator with UI manager
+        self.orchestrator = TaskOrchestrator(ui_manager=self.ui_manager)
         self.start_time = None
         self.running = False
         
@@ -102,93 +107,104 @@ class OrchestratorCLI:
             time.sleep(1.0)  # Update every 1 second (reduced flicker)
     
     def run_task(self, user_input):
-        """Run orchestrator task with live progress display"""
+        """Run orchestrator task with rich UI dashboard"""
         self.start_time = time.time()
         self.running = True
         
-        # Start progress monitoring in background thread
-        progress_thread = threading.Thread(target=self.progress_monitor, daemon=True)
-        progress_thread.start()
+        # Start rich dashboard in background thread
+        dashboard_thread = threading.Thread(target=self.ui_manager.show_orchestrator_dashboard, daemon=True)
+        dashboard_thread.start()
         
         try:
-            # Run the orchestrator
+            # Run the orchestrator with UI integration
             result = self.orchestrator.orchestrate(user_input)
             
-            # Stop progress monitoring
+            # Stop monitoring
             self.running = False
             
-            # Final display update
-            self.update_display()
+            # Wait a moment for dashboard to update
+            time.sleep(1.0)
             
-            # Show results
-            print("=" * 80)
-            print("FINAL RESULTS")
-            print("=" * 80)
-            print()
-            print(result)
-            print()
-            print("=" * 80)
+            # Show final results with rich formatting
+            self.ui_manager.console.print("\n" + "="*80)
+            self.ui_manager.console.print("🎆 FINAL RESULTS", style="bold green")
+            self.ui_manager.console.print("="*80)
+            self.ui_manager.console.print()
+            self.ui_manager.console.print(result)
+            self.ui_manager.console.print()
+            self.ui_manager.console.print("="*80)
+            
+            # Show execution summary
+            self.ui_manager.show_final_summary()
             
             return result
             
         except Exception as e:
             self.running = False
-            self.update_display()
-            print(f"\nError during orchestration: {str(e)}")
+            self.ui_manager.print_error(f"Error during orchestration: {str(e)}")
             return None
     
     def interactive_mode(self):
-        """Run interactive CLI session"""
-        print("Multi-Agent Orchestrator")
-        print(f"Configured for {self.orchestrator.num_agents} parallel agents")
-        print("Type 'quit', 'exit', or 'bye' to exit")
-        print("-" * 50)
+        """Run interactive CLI session with rich UI"""
+        # Show startup banner with rich formatting
+        self.ui_manager.print_info("🚀 Make It Heavy - Grok Heavy Mode")
+        self.ui_manager.print_info(f"Configured for {self.orchestrator.num_agents} parallel agents")
+        self.ui_manager.print_info("Type 'quit', 'exit', or 'bye' to exit")
+        self.ui_manager.console.print("-" * 50)
         
         try:
             orchestrator_config = self.orchestrator.config['openrouter']
-            print(f"Using model: {orchestrator_config['model']}")
-            print("Orchestrator initialized successfully!")
-            print("Note: Make sure to set your OpenRouter API key in config.yaml")
-            print("-" * 50)
+            self.ui_manager.print_success(f"Using model: {orchestrator_config['model']}")
+            self.ui_manager.print_success("Orchestrator initialized successfully!")
+            self.ui_manager.print_warning("Note: Make sure to set your OpenRouter API key in config.yaml")
+            self.ui_manager.console.print("-" * 50)
         except Exception as e:
-            print(f"Error initializing orchestrator: {e}")
-            print("Make sure you have:")
-            print("1. Set your OpenRouter API key in config.yaml")
-            print("2. Installed all dependencies with: pip install -r requirements.txt")
+            self.ui_manager.print_error(f"Error initializing orchestrator: {e}")
+            self.ui_manager.console.print("Make sure you have:")
+            self.ui_manager.console.print("1. Set your OpenRouter API key in config.yaml")
+            self.ui_manager.console.print("2. Installed all dependencies with: pip install -r requirements.txt")
             return
         
         while True:
             try:
-                user_input = input("\nUser: ").strip()
+                user_input = input("\n🤖 Enter your question for multi-agent analysis: ").strip()
                 
                 if user_input.lower() in ['quit', 'exit', 'bye']:
-                    print("Goodbye!")
+                    self.ui_manager.print_success("Goodbye!")
                     break
                 
                 if not user_input:
-                    print("Please enter a question or command.")
+                    self.ui_manager.print_warning("Please enter a question or command.")
                     continue
                 
-                print("\nOrchestrator: Starting multi-agent analysis...")
-                print()
+                self.ui_manager.print_info("\nOrchestrator: Starting multi-agent analysis...")
+                self.ui_manager.console.print()
                 
-                # Run task with live progress
+                # Run task with rich UI dashboard
                 result = self.run_task(user_input)
                 
                 if result is None:
-                    print("Task failed. Please try again.")
+                    self.ui_manager.print_error("Task failed. Please try again.")
                 
             except KeyboardInterrupt:
-                print("\n\nExiting...")
+                self.ui_manager.print_warning("\n\nExiting...")
                 break
             except Exception as e:
-                print(f"Error: {e}")
-                print("Please try again or type 'quit' to exit.")
+                self.ui_manager.print_error(f"Error: {e}")
+                self.ui_manager.print_info("Please try again or type 'quit' to exit.")
 
 def main():
     """Main entry point for the orchestrator CLI"""
-    cli = OrchestratorCLI()
-    cli.interactive_mode()
+    try:
+        cli = OrchestratorCLI()
+        cli.interactive_mode()
+    except ImportError as e:
+        print(f"❌ Missing dependency: {e}")
+        print("Please install dependencies with: pip install -r requirements.txt")
+        print("Or use uv: uv pip install -r requirements.txt")
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+        print("Please check your configuration and try again.")
 
 if __name__ == "__main__":
     main()

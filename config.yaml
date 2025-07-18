@@ -1,12 +1,12 @@
 # OpenRouter API settings
 openrouter:
-  api_key: "YOUR KEY"
+  api_key: "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"
   base_url: "https://openrouter.ai/api/v1"
   
   # IMPORTANT: When selecting a model, ensure it has a high context window (200k+ tokens recommended)
   # The orchestrator can generate large amounts of results from multiple agents that need to be
   # processed together during synthesis. Low context window models may fail or truncate results.
-  model: "moonshotai/kimi-k2"
+  model: "moonshotai/kimi-k2:free"
 
 # System prompt for the agent
 system_prompt: |
@@ -59,3 +59,69 @@ orchestrator:
 search:
   max_results: 5
   user_agent: "Mozilla/5.0 (compatible; OpenRouter Agent)"
+
+# UI and Display settings
+ui:
+  # Enable rich terminal output with colors and progress bars
+  rich_output: true
+  
+  # Show real-time progress updates during execution
+  show_progress: true
+  
+  # Update frequency for progress displays (times per second)
+  progress_update_frequency: 4
+  
+  # Show detailed metrics (API calls, tokens, execution time)
+  show_metrics: true
+  
+  # Show timeline of operations
+  show_timeline: true
+  
+  # Maximum number of timeline events to display
+  max_timeline_events: 10
+  
+  # Silent mode - suppress all output except results
+  silent_mode: false
+  
+  # Verbose mode - show additional debug information
+  verbose_mode: false
+
+# Logging settings
+logging:
+  # Enable structured logging
+  enabled: true
+  
+  # Log level (DEBUG, INFO, WARNING, ERROR)
+  level: "INFO"
+  
+  # Log to file in addition to console
+  log_to_file: false
+  
+  # Log file path (if log_to_file is true)
+  log_file_path: "make_it_heavy.log"
+  
+  # Log format
+  log_format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # Include timestamps in console output
+  include_timestamps: true
+  
+  # Log API calls and responses (be careful with sensitive data)
+  log_api_calls: false
+
+# Performance settings
+performance:
+  # Maximum concurrent agents (should not exceed parallel_agents)
+  max_concurrent_agents: 4
+  
+  # API call timeout in seconds
+  api_timeout: 30
+  
+  # Retry failed API calls
+  retry_failed_calls: true
+  
+  # Maximum number of retries
+  max_retries: 3
+  
+  # Delay between retries in seconds
+  retry_delay: 1.0

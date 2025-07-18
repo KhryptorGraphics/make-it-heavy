@@ -3,11 +3,11 @@ import yaml
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from agent import OpenRouterAgent
 
 class TaskOrchestrator:
-    def __init__(self, config_path="config.yaml", silent=False):
+    def __init__(self, config_path: str = "config.yaml", silent: bool = False, ui_manager: Optional[Any] = None) -> None:
         # Load configuration
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)
@@ -17,6 +17,9 @@ class TaskOrchestrator:
         self.aggregation_strategy = self.config['orchestrator']['aggregation_strategy']
         self.silent = silent
         
+        # UI Manager for enhanced output
+        self.ui_manager = ui_manager
+        
         # Track agent progress
         self.agent_progress = {}
         self.agent_results = {}
@@ -24,6 +27,9 @@ class TaskOrchestrator:
     
     def decompose_task(self, user_input: str, num_agents: int) -> List[str]:
         """Use AI to dynamically generate different questions based on user input"""
+        
+        if self.ui_manager:
+            self.ui_manager.update_orchestrator_phase("generating_questions", "Creating specialized questions")
         
         # Create question generation agent
         question_agent = OpenRouterAgent(silent=True)
@@ -50,18 +56,27 @@ class TaskOrchestrator:
             if len(questions) != num_agents:
                 raise ValueError(f"Expected {num_agents} questions, got {len(questions)}")
             
+            if self.ui_manager:
+                self.ui_manager.set_questions_generated(questions)
+            
             return questions
             
         except (json.JSONDecodeError, ValueError) as e:
             # Fallback: create simple variations if AI fails
-            return [
+            fallback_questions = [
                 f"Research comprehensive information about: {user_input}",
                 f"Analyze and provide insights about: {user_input}",
                 f"Find alternative perspectives on: {user_input}",
                 f"Verify and cross-check facts about: {user_input}"
             ][:num_agents]
+            
+            if self.ui_manager:
+                self.ui_manager.set_questions_generated(fallback_questions)
+                self.ui_manager.log_timeline("Question generation fallback", f"Used fallback questions due to error: {e}")
+            
+            return fallback_questions
     
-    def update_agent_progress(self, agent_id: int, status: str, result: str = None):
+    def update_agent_progress(self, agent_id: int, status: str, result: Optional[str] = None) -> None:
         """Thread-safe progress tracking"""
         with self.progress_lock:
             self.agent_progress[agent_id] = status
@@ -76,8 +91,9 @@ class TaskOrchestrator:
         try:
             self.update_agent_progress(agent_id, "PROCESSING...")
             
-            # Use simple agent like in main.py
-            agent = OpenRouterAgent(silent=True)
+            # Create agent with UI manager integration
+            agent_name = f"agent_{agent_id}"
+            agent = OpenRouterAgent(silent=True, ui_manager=self.ui_manager, agent_id=agent_name)
             
             start_time = time.time()
             response = agent.run(subtask)
@@ -93,7 +109,10 @@ class TaskOrchestrator:
             }
             
         except Exception as e:
-            # Simple error handling
+            # Error handling with UI manager integration
+            if self.ui_manager:
+                self.ui_manager.agent_failed(f"agent_{agent_id}", str(e))
+            
             return {
                 "agent_id": agent_id,
                 "status": "error",
@@ -124,7 +143,12 @@ class TaskOrchestrator:
         """
         Use one final AI call to synthesize all agent responses into a coherent answer.
         """
+        if self.ui_manager:
+            self.ui_manager.update_orchestrator_phase("synthesizing", "Combining agent responses")
+        
         if len(responses) == 1:
+            if self.ui_manager:
+                self.ui_manager.update_synthesis_progress(100.0)
             return responses[0]
         
         # Create synthesis agent to combine all responses
@@ -148,10 +172,21 @@ class TaskOrchestrator:
         
         # Get the synthesized response
         try:
+            if self.ui_manager:
+                self.ui_manager.update_synthesis_progress(50.0)
+            
             final_answer = synthesis_agent.run(synthesis_prompt)
+            
+            if self.ui_manager:
+                self.ui_manager.update_synthesis_progress(100.0)
+                self.ui_manager.log_timeline("Synthesis completed", "Successfully combined agent responses")
+            
             return final_answer
         except Exception as e:
             # Log the error for debugging
+            if self.ui_manager:
+                self.ui_manager.log_timeline("Synthesis failed", f"Error: {str(e)}", "ERROR")
+            
             print(f"\n🚨 SYNTHESIS FAILED: {str(e)}")
             print("📋 Falling back to concatenated responses\n")
             # Fallback: if synthesis fails, concatenate responses
@@ -167,11 +202,14 @@ class TaskOrchestrator:
         with self.progress_lock:
             return self.agent_progress.copy()
     
-    def orchestrate(self, user_input: str):
+    def orchestrate(self, user_input: str) -> str:
         """
         Main orchestration method.
         Takes user input, delegates to parallel agents, and returns aggregated result.
         """
+        
+        if self.ui_manager:
+            self.ui_manager.update_orchestrator_phase("initializing", "Starting orchestration")
         
         # Reset progress tracking
         self.agent_progress = {}
@@ -183,6 +221,9 @@ class TaskOrchestrator:
         # Initialize progress tracking
         for i in range(self.num_agents):
             self.agent_progress[i] = "QUEUED"
+        
+        if self.ui_manager:
+            self.ui_manager.update_orchestrator_phase("running_agents", "Executing parallel agents")
         
         # Execute agents in parallel
         agent_results = []
@@ -199,6 +240,10 @@ class TaskOrchestrator:
                 try:
                     result = future.result()
                     agent_results.append(result)
+                    
+                    if self.ui_manager:
+                        self.ui_manager.log_timeline(f"Agent {result['agent_id']} completed", 
+                                                   f"Status: {result['status']}, Time: {result['execution_time']:.2f}s")
                 except Exception as e:
                     agent_id = future_to_agent[future]
                     agent_results.append({
@@ -207,11 +252,17 @@ class TaskOrchestrator:
                         "response": f"Agent {agent_id + 1} timed out or failed: {str(e)}",
                         "execution_time": self.task_timeout
                     })
+                    
+                    if self.ui_manager:
+                        self.ui_manager.log_timeline(f"Agent {agent_id} failed", str(e), "ERROR")
         
         # Sort results by agent_id for consistent output
         agent_results.sort(key=lambda x: x["agent_id"])
         
         # Aggregate results
         final_result = self.aggregate_results(agent_results)
+        
+        if self.ui_manager:
+            self.ui_manager.update_orchestrator_phase("completed", "Orchestration finished")
         
         return final_result
